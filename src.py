@@ -1,278 +1,278 @@
-print("step 1: Importing the required libraries")
+"""
+Optimized Machine Learning Pipeline for Predicting Online Shoppers Behavior
+===========================================================================
+Author: Pavan Kumar (gujjaripavan222)
+Dataset: Online Shoppers Intention (UCI ML Repository)
+Goal: Classify e-commerce sessions as buyer (1) or non-buyer (0)
+
+Pipeline Steps:
+    1. Data loading & preprocessing
+    2. Feature engineering
+    3. Train/test split
+    4. Model benchmarking with 10-fold cross-validation (ROC-AUC)
+    5. Best model training & evaluation
+"""
+
 import time
-import pandas as pd
+import warnings
+
 import numpy as np
-import matplotlib.pyplot as plt # type: ignore
+import pandas as pd
+import matplotlib.pyplot as plt
 import seaborn as sns
-#Importing model training functions through sklearn library
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import GridSearchCV
-#Importing feature_selection class 
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import chi2
 
 from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-#Importing pipeline from imblearn library
-from imblearn.pipeline import Pipeline as IMBPipeline
-from sklearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE # type: ignore
-#Importing metrics to configure accuracy
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import f1_score
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-#Importing feature engineering class from sklearn library
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.preprocessing import OrdinalEncoder
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import StandardScaler
-#Importing machine learning models
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.linear_model import RidgeClassifier
-from sklearn.naive_bayes import BernoulliNB
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
 from sklearn.dummy import DummyClassifier
-from sklearn.tree import ExtraTreeClassifier
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.linear_model import SGDClassifier
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import (
+    AdaBoostClassifier,
+    BaggingClassifier,
+    ExtraTreesClassifier,
+    RandomForestClassifier,
+)
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import RidgeClassifier, SGDClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
-#Importing warnings package to avoid warnings
-import warnings
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier, ExtraTreeClassifier
+
+from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline as IMBPipeline
+
+from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
+
 warnings.filterwarnings("ignore")
 
-#Loads the dataset from a GitHub repository into a Pandas DataFrame.
-#displays top 5 rows
-print("step 2: Loading the dataset and created dataframe successfully")
-df=pd.read_csv("https://raw.githubusercontent.com/gujjaripavan222/Optimized-Machine-Learning-Pipeline-for-Predicting-Online-Shoppers-Behavior/refs/heads/main/online_shoppers_intention.csv")
-print(df.head())
-
-print("step 3: Feature engineering on Weekend and Revenue column")
-
-#Converts boolean values (True/False) into numerical values (1/0).
-df["Weekend"]=df["Weekend"].replace((True,False),(1,0))
-df["Revenue"]=df["Revenue"].replace((True,False),(1,0))
-
-print("step 4: Adding Returning_Visitor Column from Visitor Type Column")
-
-#Creates a new column Returning_Visitor based on VisitorType.
-#Drops the original VisitorType column.
-condition=df["VisitorType"]=="Returning_Visitor"
-df["Returning_Visitor"]=np.where(condition,1,0)
-df=df.drop(columns=["VisitorType"])
-
-print("step 5: Applying OneHotEncoding on Month Column")
-
-#Converts categorical month names into numerical values.
-ordinal_encoder=OrdinalEncoder()
-df["Month"]=ordinal_encoder.fit_transform(df[["Month"]])
-
-print("step 6: Checking correlation on Revenue column")
-
-#Computes correlation between Revenue and other features.
-result=df[df.columns[1:]].corr()["Revenue"]
-#Sorts features by correlation strength.
-result1=result.sort_values(ascending=False)
-"""
-#Data Visualization on feature distributions
-plt.figure(figsize=(12, 6))
-df.hist(bins=20, figsize=(12, 10), edgecolor="black")
-plt.tight_layout()
-plt.show()
-
-#visualizing correlation heatmap
-plt.figure(figsize=(10, 6))
-sns.heatmap(df.corr(), annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-plt.title("Feature Correlation Heatmap")
-plt.show()
-
-#visualizing Target variable distributions
-sns.countplot(x="Revenue", data=df, palette="Set2")
-plt.title("Revenue Distribution")
-plt.show()
-
-#visualizing key feature impact on Revenue
-sns.barplot(x="Weekend", y="Revenue", data=df, palette="viridis")
-plt.title("Weekend vs Revenue")
-plt.show()
-
-sns.boxplot(x="Revenue", y="Administrative_Duration", data=df)
-plt.title("Administrative Duration Impact on Revenue")
-plt.show()
-
-#visaulizing to check outliers
-plt.figure(figsize=(12, 5))
-sns.boxplot(data=df, palette="Set3")
-plt.xticks(rotation=90)
-plt.title("Outlier Detection")
-plt.show()
-"""
-print("step 7: Data preparation on features as X and Target as y")
-
-#Splits dataset into features (X) and target (y).
-X=df.drop(["Revenue"],axis=1)
-y=df["Revenue"]
-
-print("step 8: Splitting the dataset X_train,X_test,y_train and y_test ")
-
-#Splits data into 70% training and 30% testing.
-X_train,X_test,y_train,y_test=train_test_split(
-        X,
-        y,
-        test_size=0.3,
-        random_state=0
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+DATASET_URL = (
+    "https://raw.githubusercontent.com/gujjaripavan222/"
+    "Optimized-Machine-Learning-Pipeline-for-Predicting-Online-Shoppers-Behavior/"
+    "refs/heads/main/online_shoppers_intention.csv"
 )
+TEST_SIZE = 0.3
+RANDOM_STATE = 0
+CV_FOLDS = 10
+N_BEST_FEATURES = 6
 
-print("step 9: Model Pipeline")
 
-def model_pipeline(X,model):
-    #Identifies numerical (n_c) and categorical (c_c) columns.
-    n_c=X.select_dtypes(exclude=["object"]).columns.tolist()
-    c_c=X.select_dtypes(include=["object"]).columns.tolist()
-    #Imputes missing values and scales numerical features.
-    numeric_pipeline=Pipeline([
-        ("imputer",SimpleImputer(strategy="constant")),
-        ("scaler",MinMaxScaler())
-        ])
-    #Encodes categorical features.
-    categoric_pipeline=Pipeline([
-        ("encoder",OneHotEncoder(handle_unknown="ignore"))
-        ])
-    #Combines numerical and categorical preprocessing.
-    preprocessor=ColumnTransformer([
-        ("numeric",numeric_pipeline,n_c),
-        ("categorical",categoric_pipeline,c_c)],
-        remainder="passthrough")
-    #Applies preprocessing, oversampling, feature selection, and classification.
-    final_steps=[
-        ("preprocessor",preprocessor),
-        ("smote",SMOTE(random_state=1)),
-        ("feature_selection",SelectKBest(score_func=chi2,k=6)),
-        ("model",model)
-        ]
-    return IMBPipeline(steps=final_steps)
-print("step 10: create select_model function")
-def select_model(X,y,pipeline=None):
-    #Defines a dictionary of classification models.
-    classifiers={}
+# ---------------------------------------------------------------------------
+# Step 1: Load Data
+# ---------------------------------------------------------------------------
+def load_data(url: str) -> pd.DataFrame:
+    """Load the Online Shoppers Intention dataset from a URL."""
+    print("\n[Step 1] Loading dataset...")
+    df = pd.read_csv(url)
+    print(f"  Shape: {df.shape}")
+    print(df.head())
+    return df
 
-    c_d1={"RandomForestClassifier": RandomForestClassifier()}
-    classifiers.update(c_d1)
-    c_d2={"KNeigborsClassifier": KNeighborsClassifier()}
-    classifiers.update(c_d2)
-    c_d3={"DecisionTreeClassifier": DecisionTreeClassifier()}
-    classifiers.update(c_d3)
-    c_d4={"RidgeClassifier": RidgeClassifier()}
-    classifiers.update(c_d4)
-    c_d5={"SVC": SVC()}
-    classifiers.update(c_d5)
-    c_d6={"DummyClassifier":DummyClassifier(strategy="most_frequent")}
-    classifiers.update(c_d6)
-    c_d7={"LGBMClassifier":LGBMClassifier()}
-    classifiers.update(c_d7)
-    c_d8={"ExtraTreeClassifier":ExtraTreeClassifier()}
-    classifiers.update(c_d8)
-    c_d9={"ExtraTreesClassifier":ExtraTreesClassifier()}
-    classifiers.update(c_d9)
-    c_d10={"BernoulliNB":BernoulliNB()}
-    classifiers.update(c_d10)
-    c_d11={"XGBClassifier": XGBClassifier()}
-    classifiers.update(c_d11)
-    c_d12={"SGDClassifier": SGDClassifier()}
-    classifiers.update(c_d12)
-    c_d13={"AdaBoostClassifier": AdaBoostClassifier()}
-    classifiers.update(c_d13)
-    c_d14={"BaggingClassifier": BaggingClassifier()}
-    classifiers.update(c_d14)
 
-    mlpc={
-        "MLPClassifier (paper)": 
-        MLPClassifier(hidden_layer_sizes=(27,50),
+# ---------------------------------------------------------------------------
+# Step 2: Feature Engineering
+# ---------------------------------------------------------------------------
+def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply feature engineering:
+    - Encode boolean columns (Weekend, Revenue) as 0/1
+    - Create Returning_Visitor binary column from VisitorType
+    - Ordinal-encode Month column
+    """
+    print("\n[Step 2] Engineering features...")
+
+    # Encode boolean columns
+    df["Weekend"] = df["Weekend"].astype(int)
+    df["Revenue"] = df["Revenue"].astype(int)
+
+    # Binary feature: is the visitor a returning visitor?
+    df["Returning_Visitor"] = (df["VisitorType"] == "Returning_Visitor").astype(int)
+    df.drop(columns=["VisitorType"], inplace=True)
+
+    # Ordinal-encode the Month column
+    ordinal_encoder = OrdinalEncoder()
+    df["Month"] = ordinal_encoder.fit_transform(df[["Month"]])
+
+    # Log top correlations with target
+    correlations = df.corr()["Revenue"].drop("Revenue").sort_values(ascending=False)
+    print("\n  Top feature correlations with Revenue:")
+    print(correlations.head(8).to_string())
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Step 3: Train/Test Split
+# ---------------------------------------------------------------------------
+def split_data(df: pd.DataFrame):
+    """Split the dataset into training and test sets (70/30)."""
+    print("\n[Step 3] Splitting dataset (70% train / 30% test)...")
+    X = df.drop(columns=["Revenue"])
+    y = df["Revenue"]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
+    )
+    print(f"  X_train: {X_train.shape} | X_test: {X_test.shape}")
+    return X_train, X_test, y_train, y_test
+
+
+# ---------------------------------------------------------------------------
+# Step 4: Build Pipeline
+# ---------------------------------------------------------------------------
+def build_pipeline(X: pd.DataFrame, model) -> IMBPipeline:
+    """
+    Construct an IMBPipeline for a given classifier:
+        ColumnTransformer → SMOTE → SelectKBest → model
+    """
+    numeric_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
+    categorical_cols = X.select_dtypes(include=["object"]).columns.tolist()
+
+    numeric_pipeline = Pipeline([
+        ("imputer", SimpleImputer(strategy="constant")),
+        ("scaler", MinMaxScaler()),
+    ])
+
+    categorical_pipeline = Pipeline([
+        ("encoder", OneHotEncoder(handle_unknown="ignore")),
+    ])
+
+    preprocessor = ColumnTransformer([
+        ("numeric", numeric_pipeline, numeric_cols),
+        ("categorical", categorical_pipeline, categorical_cols),
+    ], remainder="passthrough")
+
+    steps = [
+        ("preprocessor", preprocessor),
+        ("smote", SMOTE(random_state=1)),
+        ("feature_selection", SelectKBest(score_func=chi2, k=N_BEST_FEATURES)),
+        ("model", model),
+    ]
+    return IMBPipeline(steps=steps)
+
+
+# ---------------------------------------------------------------------------
+# Step 5: Benchmark All Models
+# ---------------------------------------------------------------------------
+def benchmark_models(X_train: pd.DataFrame, y_train: pd.Series) -> pd.DataFrame:
+    """
+    Evaluate a suite of classifiers using 10-fold cross-validation (ROC-AUC).
+    Returns a DataFrame of results sorted by ROC-AUC descending.
+    """
+    classifiers = {
+        "RandomForestClassifier": RandomForestClassifier(),
+        "KNeighborsClassifier": KNeighborsClassifier(),
+        "DecisionTreeClassifier": DecisionTreeClassifier(),
+        "RidgeClassifier": RidgeClassifier(),
+        "SVC": SVC(),
+        "DummyClassifier": DummyClassifier(strategy="most_frequent"),
+        "LGBMClassifier": LGBMClassifier(),
+        "ExtraTreeClassifier": ExtraTreeClassifier(),
+        "ExtraTreesClassifier": ExtraTreesClassifier(),
+        "BernoulliNB": BernoulliNB(),
+        "XGBClassifier": XGBClassifier(),
+        "SGDClassifier": SGDClassifier(),
+        "AdaBoostClassifier": AdaBoostClassifier(),
+        "BaggingClassifier": BaggingClassifier(),
+        "MLPClassifier": MLPClassifier(
+            hidden_layer_sizes=(27, 50),
+            max_iter=300,
+            activation="relu",
+            solver="adam",
+            random_state=1,
+        ),
+    }
+
+    print(f"\n[Step 4] Benchmarking {len(classifiers)} models ({CV_FOLDS}-fold CV)...")
+    results = []
+
+    for name, model in classifiers.items():
+        start = time.time()
+        pipeline = build_pipeline(X_train, model)
+        cv_scores = cross_val_score(
+            pipeline, X_train, y_train, cv=CV_FOLDS, scoring="roc_auc"
+        )
+        elapsed = round((time.time() - start) / 60, 2)
+        results.append({
+            "Model": name,
+            "ROC-AUC (mean)": round(cv_scores.mean(), 4),
+            "ROC-AUC (std)": round(cv_scores.std(), 4),
+            "Run Time (min)": elapsed,
+        })
+        print(f"  ✔ {name:35s}  ROC-AUC={cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+
+    df_results = pd.DataFrame(results).sort_values("ROC-AUC (mean)", ascending=False)
+    return df_results
+
+
+# ---------------------------------------------------------------------------
+# Step 6: Train Best Model & Evaluate
+# ---------------------------------------------------------------------------
+def evaluate_best_model(X_train, X_test, y_train, y_test) -> None:
+    """Train the best model (MLPClassifier) and print full evaluation metrics."""
+    print("\n[Step 5] Training best model: MLPClassifier...")
+
+    best_model = MLPClassifier(
+        hidden_layer_sizes=(27, 50),
         max_iter=300,
         activation="relu",
         solver="adam",
-        random_state=1)
-        }
-    c_d15=mlpc
-    classifiers.update(c_d15)
+        random_state=1,
+    )
+    pipeline = build_pipeline(X_train, best_model)
+    pipeline.fit(X_train, y_train)
 
-    cols=["model","run_time","roc_auc"]
-    df_models=pd.DataFrame(columns=cols)
+    y_pred = pipeline.predict(X_test)
 
-    #Runs cross-validation for each model
-    for key in classifiers:
-        start_time=time.time()
-        print()
-        print("step 11: Model pipeline run successfully on ",key)
-        pipeline=model_pipeline(X_train,classifiers[key])
-        cv_scores=cross_val_score(pipeline,X,y,cv=10,scoring="roc_auc")
+    acc = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    roc = roc_auc_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
 
-        row={
-            "model":key,
-            "run_time":format(round((time.time()-start_time)/60,2)),
-            "roc_auc":cv_scores.mean()
-        }
+    print("\n" + "=" * 50)
+    print("  EVALUATION RESULTS")
+    print("=" * 50)
+    print(f"  Accuracy  : {acc:.4f} ({acc*100:.2f}%)")
+    print(f"  F1-Score  : {f1:.4f}")
+    print(f"  ROC-AUC   : {roc:.4f}")
+    print("\n  Confusion Matrix:")
+    print(cm)
+    print("\n  Classification Report:")
+    print(classification_report(y_test, y_pred, target_names=["Non-Buyer", "Buyer"]))
 
-        df_models=pd.concat([df_models,pd.DataFrame([row])],ignore_index=True)
-    df_models=df_models.sort_values(by="roc_auc",ascending=False)
 
-    return df_models
-print("step 12: Accessing select_model function successfully")
-models=select_model(X_train,y_train)
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main():
+    print("=" * 60)
+    print("  Online Shoppers Behavior — ML Pipeline")
+    print("=" * 60)
 
-print("step 13: running select_model successfully")
-print(models)
+    df = load_data(DATASET_URL)
+    df = engineer_features(df)
+    X_train, X_test, y_train, y_test = split_data(df)
 
-print("step 14: Accessing best model function ")
+    model_rankings = benchmark_models(X_train, y_train)
+    print("\n[Results] Model Rankings by ROC-AUC:")
+    print(model_rankings.to_string(index=False))
 
-#Trains the best model.
-selected_model=MLPClassifier()
-bundled_pipeline=model_pipeline(X_train,selected_model)
-bundled_pipeline.fit(X_train,y_train)
+    evaluate_best_model(X_train, X_test, y_train, y_test)
 
-print("step 15: predicting results successfully")
+    print("\n✅ Pipeline complete.")
 
-#Predicts test data.
-y_pred=bundled_pipeline.predict(X_test)
 
-print(y_pred)
-
-print("step 16: Accessing Roc and Auc scores")
-
-#Evaluates performance using accuracy, F1-score, ROC-AUC, and confusion matrix.
-roc_auc=roc_auc_score(y_test,y_pred)
-accuracy=accuracy_score(y_test,y_pred)
-f1_score=f1_score(y_test,y_pred)
-
-print("ROC/AUC:",roc_auc)
-print("Accuracy:",accuracy)
-print("f1_score:",f1_score)
-
-print("step 17: Generating Confusion matrix")
-
-confusion=confusion_matrix(y_test,y_pred)
-print(confusion)
-
-print("step 17: Generating Classification Report Successfully")
-classif_report=classification_report(y_test,y_pred)
-print(classif_report)
-
-"""
-The optimized machine learning pipeline achieved an accuracy of 87.67%,
-demonstrating its strong predictive capability for online shoppers' purchasing behavior.
-The best-performing model, MLPClassifier (paper), achieved a ROC-AUC score of 0.903,
-indicating its excellent ability to distinguish between classes
-"""
-# machine learning pipeline has been successfully implemented and completed,
-# achieving 87.67% accuracy with an MLPClassifier as the best-performing model.
-# This python code is a complete ML pipeline for predicting online shopper behavior.
-# Uses preprocessing, feature engineering, and multiple models to find the best one.
-# Employs cross-validation and performance evaluation techniques.
+if __name__ == "__main__":
+    main()
